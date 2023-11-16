@@ -36,3 +36,98 @@ The results of the project are as follows:
 
 The strategy is paper traded using the [Alpaca](https://alpaca.markets/) API. 
 
+### Sample Images
+
+![Cumulative Returns](./image/cumret.png?raw=true "Cumulative Returns")
+![Drawdowns](./image/drawdown.png?raw=true "Drawdowns")
+
+#### Sharpe Ratios
+```
+All set: 
+Strategy                           10.035522
+Strategy with transaction costs     5.084462
+SPY                                 1.262039
+
+Train set: 
+Strategy                           10.620371
+Strategy with transaction costs     5.291418
+SPY                                 1.236930
+
+Test set: 
+Strategy                           9.825243
+Strategy with transaction costs    5.009323
+SPY                                1.313724
+```
+
+#### Sortino Ratios
+```
+All set: 
+Strategy                           25.980593
+Strategy with transaction costs    12.125281
+SPY                                 2.160946
+
+Train set: 
+Strategy                           29.553379
+Strategy with transaction costs    12.778654
+SPY                                 2.196900
+
+Test set: 
+Strategy                           24.759964
+Strategy with transaction costs    11.843611
+SPY                                 2.333066
+```
+
+#### Max Drawdowns 
+```
+All set: 
+Strategy                          -0.012960
+Strategy with transaction costs   -0.019864
+SPY                               -0.099037
+
+Train set: 
+Strategy                          -0.005251
+Strategy with transaction costs   -0.013484
+SPY                               -0.079665
+
+Test set: 
+Strategy                          -0.012960
+Strategy with transaction costs   -0.019864
+SPY                               -0.099037
+```
+
+#### Annualized Returns
+```
+All set: 
+Strategy                           0.659216
+Strategy with transaction costs    0.291579
+SPY                                0.180609
+
+Train set: 
+Strategy                           0.634298
+Strategy with transaction costs    0.275890
+SPY                                0.232550
+
+Test set: 
+Strategy                           0.669036
+Strategy with transaction costs    0.297748
+SPY                                0.160954
+```
+
+#### Calmar Ratios 
+```
+All set: 
+Strategy                           50.866411
+Strategy with transaction costs    14.678749
+SPY                                 1.823650
+
+Train set: 
+Strategy                           120.785411
+Strategy with transaction costs     20.460122
+SPY                                  2.919084
+
+Test set: 
+Strategy                           51.624085
+Strategy with transaction costs    14.989350
+SPY                                 1.625185
+```
+
