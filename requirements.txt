@@ -1,0 +1,8 @@
+matplotlib==3.7.2
+multiprocess==0.70.15
+numpy==1.25.2
+pandas==2.0.3
+pmdarima==2.0.3
+pykalman==0.9.5
+statsmodels==0.14.0
+yfinance==0.2.27
