@@ -1,0 +1,24 @@
+REQUIREMENTS.TXT
+to freeze requirements.txt use pigar insted: https://github.com/Damnever/pigar
+pip install pigar
+#then
+pigar generate
+# list all files which referenced the package/distribution
+pigar gen --with-referenced-comments
+
+PYTHON VIRTUAL ENVIRONMENT
+Simply put all the dependencies of your python 3.9 (venv) in requirements.txt file
+
+pip freeze > requirements.txt
+Create a new folder then move that file inside the newly created folder then execute the following code
+`newenv` is the folder name
+python -m venv newenv 
+activate the newly created environment by
+
+source newenv/bin/activate
+then install the required dependencies by
+
+pip install -r requirements.txt
+Note: If your OS do not have 'venv' module then simply install it by using
+
+pip install venv
