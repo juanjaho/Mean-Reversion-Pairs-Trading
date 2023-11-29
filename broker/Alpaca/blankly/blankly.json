@@ -1,0 +1,19 @@
+{
+    "main_script": "bot.py",
+    "python_version": "3.9",
+    "requirements": "./requirements.txt",
+    "working_directory": ".",
+    "ignore_files": [
+        "price_caches",
+        ".git",
+        ".idea",
+        ".vscode"
+    ],
+    "backtest_args": {
+        "to": "1y"
+    },
+    "screener": {
+        "schedule": "30 14 * * 1-5"
+    },
+    "type": "strategy"
+}

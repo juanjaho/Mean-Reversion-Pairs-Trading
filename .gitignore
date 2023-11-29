@@ -1,8 +1,8 @@
 .env
 .env.*
+*.ignore.*
 
-
+keys.json
 /venv
-/broker
 
 self_reference.txt
