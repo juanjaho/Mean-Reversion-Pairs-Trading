@@ -9,6 +9,7 @@ from blankly import (
 )
 from blankly.indicators import sma
 from arima_model import ArimaStrategy
+import pickle
 
 TICKERS = ["NWS", "NWSA"]
 PERIOD = "1M"
@@ -35,16 +36,17 @@ def init(symbols, state: StrategyState):
     # Data kept as a deque to reduce memory usage
     # keys: ['high', 'low', 'volume', 'close', 'open', 'time']
     variables["x_history"] = state.interface.history(
-        symbols[0], to=50, return_as="deque", resolution=RESOLUTION
+        symbols[0], to=50, return_as="deque", 
     )[TRADE_ON]
     variables["y_history"] = state.interface.history(
-        symbols[1], to=50, return_as="deque", resolution=RESOLUTION
+        symbols[1], to=50, return_as="deque", 
     )[TRADE_ON]
 
     variables["model"] = ArimaStrategy(variables["x_history"], variables["y_history"])
 
     variables["prev_long_decision"] = (0, 0)
     variables["prev_short_decision"] = (0, 0)
+    variables["prev_decision"] = (0, 0)
 
     variables["cash"] = []
     variables["x_position"]= [state.interface.account[symbols[0]].available]
@@ -54,7 +56,7 @@ def init(symbols, state: StrategyState):
 
 
 def teardown(symbols, state: StrategyState):
-
+    print("teardown")
     # close all positions
     interface: Interface = state.interface
     variables = state.variables
@@ -121,13 +123,34 @@ def price_event(prices, symbols, state: StrategyState):
         if short_decision == (None, None):
             short_decision = (0, 0)
 
-    variables["prev_long_decision"] = long_decision
-    variables["prev_short_decision"] = short_decision
-
     decision = (
         long_decision[0] + short_decision[0],
         long_decision[1] + short_decision[1],
     )
+
+    # if today's decision is different from yesterday's, then we need to close our position first
+    if variables["prev_decision"] != decision:
+        # close all positions
+        curr_x_unit = interface.account[symbols[0]].available 
+        curr_y_unit = interface.account[symbols[1]].available
+
+        # truncate to precision
+        curr_x_unit = trunc(curr_x_unit, variables["precision"])
+        curr_y_unit = trunc(curr_y_unit, variables["precision"])
+
+        if curr_x_unit > 0:
+            interface.market_order(symbols[0], "sell", curr_x_unit)
+        elif curr_x_unit < 0:
+            interface.market_order(symbols[0], "buy", abs(curr_x_unit))
+
+        if curr_y_unit > 0:
+            interface.market_order(symbols[1], "sell", curr_y_unit)
+        elif curr_y_unit < 0:
+            interface.market_order(symbols[1], "buy", abs(curr_y_unit))
+    
+    variables["prev_long_decision"] = long_decision
+    variables["prev_short_decision"] = short_decision
+    variables["prev_decision"] = decision
 
     cash_available = interface.cash * PCT_BALANCE_TO_TRADE
     curr_x_unit = interface.account[symbols[0]].available
@@ -161,8 +184,10 @@ def price_event(prices, symbols, state: StrategyState):
     y_diff = trunc(y_diff, variables["precision"])
 
     if x_diff > 0:
+        print("shorting...")
         interface.market_order(symbols[0], "buy", x_diff)
     elif x_diff < 0:
+        print("longing...")
         interface.market_order(symbols[0], "sell", abs(x_diff))
 
     if y_diff > 0:
@@ -177,6 +202,10 @@ def price_event(prices, symbols, state: StrategyState):
     variables["y_position"].append(interface.account[symbols[1]].available)
     variables["x_fee"].append(interface.get_fees(symbols[0]))
     variables["y_fee"].append(interface.get_fees(symbols[1]))
+
+    # write as pickle
+    with open('arima_logs.pkl', 'wb') as f:
+        pickle.dump(variables, f)
 
     # update model
     model.update(x_data_point, y_data_point)
