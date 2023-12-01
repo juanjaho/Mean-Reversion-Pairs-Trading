@@ -216,10 +216,10 @@ if __name__ == "__main__":
     alpaca = Alpaca(portfolio_name="alpaca_test")
 
     # Create a paper trade exchange (local paper trading)
-    # alpaca_paper_trade = PaperTrade(alpaca)
+    alpaca_paper_trade = PaperTrade(alpaca)
 
     # Create a strategy
-    strategy = Strategy(alpaca)
+    strategy = Strategy(alpaca_paper_trade)
 
     # [x, y]
     strategy.add_arbitrage_event(price_event, TICKERS, resolution=RESOLUTION, init=init, teardown=teardown)
