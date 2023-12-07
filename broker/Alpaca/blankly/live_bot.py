@@ -43,6 +43,7 @@ def init(symbols, state: StrategyState):
     )[TRADE_ON]
 
     variables["model"] = ArimaStrategy(variables["x_history"], variables["y_history"])
+    variables["updated_model_today"] = False
 
     variables["prev_long_decision"] = (0, 0)
     variables["prev_short_decision"] = (0, 0)
@@ -90,28 +91,46 @@ def teardown(symbols, state: StrategyState):
     
     # write as pickle
     import pickle
-    with open('logs.pkl', 'wb') as f:
+    with open('arime_live_logs.pkl', 'wb') as f:
         pickle.dump(logs, f)
 
 
 
 
 def price_event(prices, symbols, state: StrategyState):
-    print("Price event", prices)
     interface: Interface = state.interface
     variables = state.variables
     model: ArimaStrategy = variables["model"]
     x_data_point = prices[symbols[0]]
     y_data_point = prices[symbols[1]]
 
+    is_market_open = alpaca.get_market_clock()["is_open"]
+    if not is_market_open:
+        print("Market is closed")
+        if variables["updated_model_today"]:
+            variables["updated_model_today"] = False
+        return
+    
+    if not variables["updated_model_today"]:
+        print("Updating model...")
+        model.update(x_data_point,y_data_point)
+        variables["updated_model_today"] = True
+
+    print("Price event", prices)
+
     # make a decision to buy, sell, or hold
     # returns decision: 1 for long, -1 for short, 0 for close position
     pred_beta, long_decision, short_decision = model.make_decision(
         x_data_point,
         y_data_point,
+        0.8,
+        0.1
+    
     )
 
     # if we are carrying forward the previous decision, then we need to check if the current decision is None
+    if long_decision == variables["prev_long_decision"]:
+
     if CARRY_FORWARD_PREVIOUS_DECISION:
         if long_decision == (None, None):
             long_decision = variables["prev_long_decision"]
@@ -204,7 +223,7 @@ def price_event(prices, symbols, state: StrategyState):
     variables["y_fee"].append(interface.get_fees(symbols[1]))
 
     # write as pickle
-    with open('arima_logs.pkl', 'wb') as f:
+    with open('arime_live_logs.pkl', 'wb') as f:
         pickle.dump(variables, f)
 
     # update model
@@ -216,10 +235,10 @@ if __name__ == "__main__":
     alpaca = Alpaca(portfolio_name="alpaca_test")
 
     # Create a paper trade exchange (local paper trading)
-    alpaca_paper_trade = PaperTrade(alpaca)
+    # alpaca_paper_trade = PaperTrade(alpaca)
 
     # Create a strategy
-    strategy = Strategy(alpaca_paper_trade)
+    strategy = Strategy(alpaca)
 
     # [x, y]
     strategy.add_arbitrage_event(price_event, TICKERS, resolution=RESOLUTION, init=init, teardown=teardown)
