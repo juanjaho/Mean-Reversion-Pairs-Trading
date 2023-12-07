@@ -129,8 +129,6 @@ def price_event(prices, symbols, state: StrategyState):
     )
 
     # if we are carrying forward the previous decision, then we need to check if the current decision is None
-    if long_decision == variables["prev_long_decision"]:
-
     if CARRY_FORWARD_PREVIOUS_DECISION:
         if long_decision == (None, None):
             long_decision = variables["prev_long_decision"]
@@ -166,6 +164,8 @@ def price_event(prices, symbols, state: StrategyState):
             interface.market_order(symbols[1], "sell", curr_y_unit)
         elif curr_y_unit < 0:
             interface.market_order(symbols[1], "buy", abs(curr_y_unit))
+    else:
+        return
     
     variables["prev_long_decision"] = long_decision
     variables["prev_short_decision"] = short_decision
