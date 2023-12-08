@@ -59,9 +59,7 @@ def init(symbols, state: StrategyState):
     variables["cash"] = []
     variables["x_position"] = [state.interface.account[symbols[0]].available]
     variables["y_position"] = [state.interface.account[symbols[1]].available]
-    variables["x_fee"] = []
-    variables["y_fee"] = []
-
+    variables["decisions"] = []
 
 def teardown(symbols, state: StrategyState):
     print("teardown")
@@ -90,8 +88,7 @@ def teardown(symbols, state: StrategyState):
     variables["cash"].append(interface.cash)
     variables["x_position"].append(interface.account[symbols[0]].available)
     variables["y_position"].append(interface.account[symbols[1]].available)
-    variables["x_fee"].append(interface.get_fees(symbols[0]))
-    variables["y_fee"].append(interface.get_fees(symbols[1]))
+    variables["decisions"].append((0,0))
     logs = variables
 
     # write as pickle
@@ -244,8 +241,7 @@ def price_event(prices, symbols, state: StrategyState):
     variables["cash"].append(interface.cash)
     variables["x_position"].append(interface.account[symbols[0]].available)
     variables["y_position"].append(interface.account[symbols[1]].available)
-    variables["x_fee"].append(interface.get_fees(symbols[0]))
-    variables["y_fee"].append(interface.get_fees(symbols[1]))
+    variables["decisions"].append(decision)
 
     # write as pickle
     with open("arime_live_logs.pkl", "wb") as f:
