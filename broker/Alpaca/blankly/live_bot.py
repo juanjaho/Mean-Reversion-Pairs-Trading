@@ -10,6 +10,7 @@ from blankly import (
 from blankly.indicators import sma
 from arima_model import ArimaStrategy
 import pickle
+import time
 
 TICKERS = ["NWS", "NWSA"]
 PERIOD = "1M"
@@ -26,9 +27,11 @@ def init(symbols, state: StrategyState):
     variables = state.variables
 
     # get precision of the symbols
-    increment = next(product['base_increment']
-                     for product in state.interface.get_products()
-                     if product['symbol'] == symbols[0])
+    increment = next(
+        product["base_increment"]
+        for product in state.interface.get_products()
+        if product["symbol"] == symbols[0]
+    )
     variables["precision"] = blankly.utils.increment_to_precision(increment)
 
     # Download price data to give context to the algo
@@ -36,10 +39,14 @@ def init(symbols, state: StrategyState):
     # Data kept as a deque to reduce memory usage
     # keys: ['high', 'low', 'volume', 'close', 'open', 'time']
     variables["x_history"] = state.interface.history(
-        symbols[0], to=100, return_as="deque", 
+        symbols[0],
+        to=100,
+        return_as="deque",
     )[TRADE_ON]
     variables["y_history"] = state.interface.history(
-        symbols[1], to=100, return_as="deque", 
+        symbols[1],
+        to=100,
+        return_as="deque",
     )[TRADE_ON]
 
     variables["model"] = ArimaStrategy(variables["x_history"], variables["y_history"])
@@ -50,9 +57,9 @@ def init(symbols, state: StrategyState):
     variables["prev_decision"] = (0, 0)
 
     variables["cash"] = []
-    variables["x_position"]= [state.interface.account[symbols[0]].available]
-    variables["y_position"]= [state.interface.account[symbols[1]].available]
-    variables["x_fee"] = [] 
+    variables["x_position"] = [state.interface.account[symbols[0]].available]
+    variables["y_position"] = [state.interface.account[symbols[1]].available]
+    variables["x_fee"] = []
     variables["y_fee"] = []
 
 
@@ -80,21 +87,18 @@ def teardown(symbols, state: StrategyState):
     elif curr_y_unit < 0:
         interface.market_order(symbols[1], "buy", abs(curr_y_unit))
 
-
-
     variables["cash"].append(interface.cash)
     variables["x_position"].append(interface.account[symbols[0]].available)
     variables["y_position"].append(interface.account[symbols[1]].available)
     variables["x_fee"].append(interface.get_fees(symbols[0]))
     variables["y_fee"].append(interface.get_fees(symbols[1]))
     logs = variables
-    
+
     # write as pickle
     import pickle
-    with open('arime_live_logs.pkl', 'wb') as f:
+
+    with open("arime_live_logs.pkl", "wb") as f:
         pickle.dump(logs, f)
-
-
 
 
 def price_event(prices, symbols, state: StrategyState):
@@ -110,10 +114,10 @@ def price_event(prices, symbols, state: StrategyState):
         if variables["updated_model_today"]:
             variables["updated_model_today"] = False
         return
-    
+
     if not variables["updated_model_today"]:
         print("Updating model...")
-        model.update(x_data_point,y_data_point)
+        model.update(x_data_point, y_data_point)
         variables["updated_model_today"] = True
 
     print("Price event", prices)
@@ -121,11 +125,7 @@ def price_event(prices, symbols, state: StrategyState):
     # make a decision to buy, sell, or hold
     # returns decision: 1 for long, -1 for short, 0 for close position
     pred_beta, long_decision, short_decision = model.make_decision(
-        x_data_point,
-        y_data_point,
-        0.8,
-        0.1
-    
+        x_data_point, y_data_point, 1.0, 0.1
     )
 
     # if we are carrying forward the previous decision, then we need to check if the current decision is None
@@ -146,9 +146,11 @@ def price_event(prices, symbols, state: StrategyState):
     )
 
     # if today's decision is different from yesterday's, then we need to close our position first
+    prep_order_x = None
+    prep_order_y = None
     if variables["prev_decision"] != decision:
         # close all positions
-        curr_x_unit = interface.account[symbols[0]].available 
+        curr_x_unit = interface.account[symbols[0]].available
         curr_y_unit = interface.account[symbols[1]].available
 
         # truncate to precision
@@ -156,24 +158,37 @@ def price_event(prices, symbols, state: StrategyState):
         curr_y_unit = trunc(curr_y_unit, variables["precision"])
 
         if curr_x_unit > 0:
-            interface.market_order(symbols[0], "sell", curr_x_unit)
+            prep_order_x = interface.market_order(symbols[0], "sell", curr_x_unit)
         elif curr_x_unit < 0:
-            interface.market_order(symbols[0], "buy", abs(curr_x_unit))
+            prep_order_x = interface.market_order(symbols[0], "buy", abs(curr_x_unit))
 
         if curr_y_unit > 0:
-            interface.market_order(symbols[1], "sell", curr_y_unit)
+            prep_order_y = interface.market_order(symbols[1], "sell", curr_y_unit)
         elif curr_y_unit < 0:
-            interface.market_order(symbols[1], "buy", abs(curr_y_unit))
+            prep_order_y = interface.market_order(symbols[1], "buy", abs(curr_y_unit))
     else:
         return
-    
+
     variables["prev_long_decision"] = long_decision
     variables["prev_short_decision"] = short_decision
     variables["prev_decision"] = decision
 
+    # wait for the orders to be filled
+    while (
+        prep_order_x is not None
+        and prep_order_x.get_response()["status"] != "done"
+        or prep_order_y is not None
+        and prep_order_y.get_response()["status"] != "done"
+    ):
+        print("Waiting for prep orders to be filled...")
+        time.sleep(1)
+
+    print("prep Orders filled")
     cash_available = interface.cash * PCT_BALANCE_TO_TRADE
     curr_x_unit = interface.account[symbols[0]].available
     curr_y_unit = interface.account[symbols[1]].available
+    print("curr_x_unit should be 0", curr_x_unit)
+    print("curr_y_unit should be 0", curr_y_unit)
 
     # indicates whether we are buying or selling
     sign_x = decision[0]
@@ -202,17 +217,27 @@ def price_event(prices, symbols, state: StrategyState):
     x_diff = trunc(x_diff, variables["precision"])
     y_diff = trunc(y_diff, variables["precision"])
 
+    order_x = None
+    order_y = None
     if x_diff > 0:
-        print("shorting...")
-        interface.market_order(symbols[0], "buy", x_diff)
+        order_x = interface.market_order(symbols[0], "buy", x_diff)
     elif x_diff < 0:
-        print("longing...")
-        interface.market_order(symbols[0], "sell", abs(x_diff))
+        order_x = interface.market_order(symbols[0], "sell", abs(x_diff))
 
     if y_diff > 0:
-        interface.market_order(symbols[1], "buy", y_diff)
+        order_y = interface.market_order(symbols[1], "buy", y_diff)
     elif y_diff < 0:
-        interface.market_order(symbols[1], "sell", abs(y_diff))
+        order_y = interface.market_order(symbols[1], "sell", abs(y_diff))
+
+    # wait for the orders to be filled
+    while (
+        order_x is not None
+        and order_x.get_response()["status"] != "done"
+        or order_y is not None
+        and order_y.get_response()["status"] != "done"
+    ):
+        print("Waiting for orders to be filled...")
+        time.sleep(1)
 
     variables["x_history"].append(x_data_point)
     variables["y_history"].append(y_data_point)
@@ -223,7 +248,7 @@ def price_event(prices, symbols, state: StrategyState):
     variables["y_fee"].append(interface.get_fees(symbols[1]))
 
     # write as pickle
-    with open('arime_live_logs.pkl', 'wb') as f:
+    with open("arime_live_logs.pkl", "wb") as f:
         pickle.dump(variables, f)
 
     # update model
@@ -241,7 +266,9 @@ if __name__ == "__main__":
     strategy = Strategy(alpaca)
 
     # [x, y]
-    strategy.add_arbitrage_event(price_event, TICKERS, resolution=RESOLUTION, init=init, teardown=teardown)
+    strategy.add_arbitrage_event(
+        price_event, TICKERS, resolution=RESOLUTION, init=init, teardown=teardown
+    )
     if DEPLOY:
         print("Deploying strategy...")
         strategy.start()
